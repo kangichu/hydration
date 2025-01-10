@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from plyer import notification
 import logging
 from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal, send_email
+import threading
 
 # Hydration Tracker Configuration
 DRINK_INTERVAL = 100  # minutes (1.67 hours)
@@ -14,6 +15,7 @@ PRIZE_DAY = "Sunday"  # Day to evaluate prizes
 NOTIFICATION_TITLE = "Hydration Reminder"
 NOTIFICATION_MESSAGE = "Time to drink water!"
 SLEEP_INTERVAL = 60  # seconds
+INPUT_TIMEOUT = 60  # seconds
 
 # Send Notification
 def send_notification():
@@ -26,6 +28,22 @@ def send_notification():
         logging.info("Notification sent.")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
+
+# Function to get user input with timeout
+def input_with_timeout(prompt, timeout):
+    def get_input():
+        nonlocal user_input
+        user_input = input(prompt)
+
+    user_input = None
+    input_thread = threading.Thread(target=get_input)
+    input_thread.start()
+    input_thread.join(timeout)
+
+    if input_thread.is_alive():
+        logging.info("Input timeout reached, assuming default response 'no'.")
+        return 'no'
+    return user_input
 
 # Main Hydration Reminder Loop
 def main(stop_event):
@@ -60,8 +78,8 @@ def main(stop_event):
                     send_email("Hydration Reminder", "It's time to drink 0.5L of water!")
                     log_hydration_reminder(False, status='pending')  # Log as pending
 
-                    # Terminal prompt to ask if the user drank the water
-                    response = input("Did you drink 0.5L of water as prompted? (yes/no): ").strip().lower()
+                    # Terminal prompt to ask if the user drank the water with timeout
+                    response = input_with_timeout("Did you drink 0.5L of water as prompted? (yes/no): ", INPUT_TIMEOUT).strip().lower()
                     if response == 'yes':
                         is_drunk = True
                     else:
