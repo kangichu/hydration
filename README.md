@@ -1,7 +1,3 @@
-Here’s a coherent and structured version of the provided description:
-
----
-
 # Hydration Tracker
 
 **Description**:  
