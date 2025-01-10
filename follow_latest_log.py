@@ -3,7 +3,7 @@ import time
 import glob
 
 def get_latest_log_file():
-    log_files = glob.glob("hydration_tracker.log*")
+    log_files = glob.glob("logs/hydration_tracker.log*")
     if not log_files:
         return None
     latest_log_file = max(log_files, key=os.path.getctime)

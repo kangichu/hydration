@@ -2,12 +2,23 @@ import threading
 import signal
 import logging
 import sys
+import os
 from logging.handlers import TimedRotatingFileHandler
 from notification_handler import main as notification_main
 from db_utils import update_hydration_logs
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Ensure the logs folder exists
+log_folder = "logs"
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
 
 # Configure logging with daily rotation
-log_handler = TimedRotatingFileHandler("hydration_tracker.log", when="midnight", interval=1)
+log_file = os.getenv("LOG_FILE", "logs/hydration_tracker.log")
+log_handler = TimedRotatingFileHandler(log_file, when="midnight", interval=1)
 log_handler.suffix = "%Y-%m-%d"
 log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)s'))
 logging.getLogger().addHandler(log_handler)
