@@ -2,7 +2,9 @@ import time
 from datetime import datetime, timedelta
 from plyer import notification
 import logging
-from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal, send_email
+from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal
+from channels.email_notification import send_email
+from channels.whatsapp_notification import send_whatsapp_message
 import threading
 
 # Hydration Tracker Configuration
@@ -76,6 +78,7 @@ def main(stop_event):
                     logging.info("Time to send a hydration reminder.")
                     send_notification()
                     send_email("Hydration Reminder", "It's time to drink 0.5L of water!")
+                    send_whatsapp_message()
                     log_hydration_reminder(False, status='pending')  # Log as pending
 
                     # Terminal prompt to ask if the user drank the water with timeout
