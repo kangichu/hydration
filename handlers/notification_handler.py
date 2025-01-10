@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from plyer import notification
 import logging
-from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal
+from utils.db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal
 from channels.email_notification import send_email
 from channels.whatsapp_notification import send_whatsapp_message
 import threading

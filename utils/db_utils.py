@@ -7,6 +7,7 @@ import smtplib
 import tkinter as tk
 from tkinter import messagebox
 import threading
+import sys
 
 # Load environment variables
 load_dotenv()

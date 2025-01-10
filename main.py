@@ -3,9 +3,10 @@ import signal
 import logging
 import sys
 import os
+import subprocess
 from logging.handlers import TimedRotatingFileHandler
-from notification_handler import main as notification_main
-from db_utils import update_hydration_logs
+from handlers.notification_handler import main as notification_main
+from utils.db_utils import update_hydration_logs
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -42,6 +43,15 @@ if __name__ == "__main__":
         # Start the hydration logs update thread
         update_hydration_thread = threading.Thread(target=update_hydration_logs, args=(stop_event,))
         update_hydration_thread.start()
+
+         # Open another terminal and run follow_latest_log.py
+        if sys.platform == "win32":
+            subprocess.Popen(["start", "cmd", "/k", "python", "follow_latest_log.py"], shell=True)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-a", "Terminal", "python follow_latest_log.py"])
+        elif sys.platform == "linux":
+            subprocess.Popen(["gnome-terminal", "--", "python3", "follow_latest_log.py"])
+
 
         main_thread.join()
         update_hydration_thread.join()

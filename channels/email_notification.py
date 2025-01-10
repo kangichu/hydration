@@ -2,7 +2,7 @@ import smtplib
 import logging
 import os
 from datetime import datetime
-from db_utils import log_email_status
+from utils.db_utils import log_email_status
 
 # Email Configuration
 EMAIL = os.getenv("MAIL_USERNAME")
