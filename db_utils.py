@@ -1,23 +1,15 @@
-import os
-import time
-from datetime import datetime, timedelta
-from plyer import notification
 import mysql.connector
+import logging
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import os
+import smtplib
 import tkinter as tk
 from tkinter import messagebox
-import smtplib
 import threading
-import signal
-import sys
-import logging
 
 # Load environment variables
 load_dotenv()
-
-# Configure logging
-logging.basicConfig(filename=os.getenv("LOG_FILE", "hydration_tracker.log"), level=logging.INFO,
-                    format='%(asctime)s %(levelname)s:%(message)s')
 
 # Database Configuration
 DB_CONFIG = {
@@ -36,21 +28,10 @@ MAIL_HOST = os.getenv("MAIL_HOST")
 MAIL_PORT = int(os.getenv("MAIL_PORT"))
 MAIL_ENCRYPTION = os.getenv("MAIL_ENCRYPTION")
 
-# Hydration Tracker Configuration
-DRINK_INTERVAL = float(os.getenv("DRINK_INTERVAL", 100))  # minutes (1.67 hours)
-BOTTLE_VOLUME = float(os.getenv("BOTTLE_CAPACITY", 0.5))  # liters
-DAILY_GOAL = float(os.getenv("DAILY_GOAL", 2))  # liters
-PRIZE_DAY = os.getenv("PRIZE_DAY", "Sunday")  # Day to evaluate prizes
-
-# Notification Settings
-NOTIFICATION_TITLE = os.getenv("NOTIFICATION_TITLE", "Hydration Reminder")
-NOTIFICATION_MESSAGE = os.getenv("NOTIFICATION_MESSAGE", "Time to drink water!")
-SLEEP_INTERVAL = int(os.getenv("SLEEP_INTERVAL", 60))  # seconds
-PROMPT_TIMEOUT = int(os.getenv("PROMPT_TIMEOUT", 60))  # seconds
-
 # Initialize DB Connection
 def db_connect():
     try:
+        logging.debug("Attempting to connect to the database.")
         return mysql.connector.connect(**DB_CONFIG)
     except mysql.connector.Error as err:
         logging.error(f"Error connecting to database: {err}")
@@ -96,8 +77,36 @@ def initialize_database():
         logging.error(f"Error initializing database: {err}")
         sys.exit(1)
 
+# Get the last hydration log time
+def get_last_hydration_log_time():
+    try:
+        with db_connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT MAX(date_time) FROM hydration_logs
+            """)
+            last_log_time = cursor.fetchone()[0]
+            return last_log_time
+    except mysql.connector.Error as err:
+        logging.error(f"Error fetching last hydration log time: {err}")
+        return None
+
+# Get the last email log time
+def get_last_email_log_time():
+    try:
+        with db_connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT MAX(date_time) FROM email_logs
+            """)
+            last_email_time = cursor.fetchone()[0]
+            return last_email_time
+    except mysql.connector.Error as err:
+        logging.error(f"Error fetching last email log time: {err}")
+        return None
+
 # Log hydration reminder
-def log_hydration_reminder(is_drunk, status='completed', log_time=None):
+def log_hydration_reminder(is_drunk, status='pending', log_time=None):
     try:
         with db_connect() as conn:
             cursor = conn.cursor()
@@ -105,7 +114,7 @@ def log_hydration_reminder(is_drunk, status='completed', log_time=None):
             cursor.execute("""
             INSERT INTO hydration_logs (date_time, bottle_volume, is_drunk, status)
             VALUES (%s, %s, %s, %s)
-            """, (now, BOTTLE_VOLUME, is_drunk, status))
+            """, (now, 0.5, is_drunk, status))
             conn.commit()
             logging.info(f"Hydration reminder logged: {now}, Drunk: {is_drunk}, Status: {status}")
     except mysql.connector.Error as err:
@@ -143,8 +152,8 @@ def check_weekly_goal():
             """, (start_of_week, end_of_week))
             total_reminders, bottles_drunk = cursor.fetchone()
 
-            goal_met = bottles_drunk >= (DAILY_GOAL / BOTTLE_VOLUME) * 7
-            prize_awarded = goal_met and today.strftime('%A') == PRIZE_DAY
+            goal_met = bottles_drunk >= (2 / 0.5) * 7
+            prize_awarded = goal_met and today.strftime('%A') == "Sunday"
 
             # Insert weekly data
             cursor.execute("""
@@ -158,18 +167,6 @@ def check_weekly_goal():
                 print("Congratulations! You've won this week's hydration prize!")
     except mysql.connector.Error as err:
         logging.error(f"Error checking weekly goal: {err}")
-
-# Send Notification
-def send_notification():
-    try:
-        notification.notify(
-            title=NOTIFICATION_TITLE,
-            message=NOTIFICATION_MESSAGE,
-            timeout=10
-        )
-        logging.info("Notification sent.")
-    except Exception as e:
-        logging.error(f"Error sending notification: {e}")
 
 # Send Email
 def send_email(subject, message):
@@ -218,45 +215,17 @@ def show_hydration_popup():
         on_no()
 
     # Set a timer to automatically close the popup after the timeout
-    timer = threading.Timer(PROMPT_TIMEOUT, on_timeout)
+    timer = threading.Timer(60, on_timeout)
     timer.start()
 
     root.mainloop()
     timer.cancel()  # Cancel the timer if the user responds in time
     return is_drunk
 
-# Main Hydration Reminder Loop
-def main():
-    initialize_database()
-    last_drink_time = datetime.now() - timedelta(minutes=DRINK_INTERVAL)
-
-    while not stop_event.is_set():
-        now = datetime.now()
-        current_hour = now.hour
-
-        # Check if the current time is within the allowed range (9 AM to 12 AM)
-        if 9 <= current_hour < 24:
-            # Check if it's time to remind
-            if (now - last_drink_time).total_seconds() >= DRINK_INTERVAL * 60:
-                send_notification()
-                send_email("Hydration Reminder", "It's time to drink 0.5L of water!")
-                is_drunk = show_hydration_popup()
-                if is_drunk is None:
-                    log_hydration_reminder(False, status='pending')
-                else:
-                    log_hydration_reminder(is_drunk)
-                last_drink_time = now
-
-            # Check weekly goal at the end of the week
-            if now.strftime('%A') == PRIZE_DAY:
-                check_weekly_goal()
-
-        # Wait before the next check
-        stop_event.wait(SLEEP_INTERVAL)
-
 # CLI to update pending hydration logs
-def update_hydration_logs():
-    while True:
+def update_hydration_logs(stop_event):
+    logging.debug("Starting CLI to update pending hydration logs.")
+    while not stop_event.is_set():
         with db_connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -268,6 +237,7 @@ def update_hydration_logs():
 
         if not pending_logs:
             print("No pending hydration logs.")
+            logging.info("No pending hydration logs.")
             break
 
         print("Pending hydration logs:")
@@ -291,24 +261,10 @@ def update_hydration_logs():
                     """, (True, log_id))
                     conn.commit()
                 print(f"Updated hydration reminder for log ID {log_id}.")
+                logging.info(f"Updated hydration reminder for log ID {log_id}.")
             else:
                 print("Invalid selection. Please try again.")
+                logging.warning("Invalid selection.")
         except ValueError:
             print("Invalid input. Please enter a number.")
-
-# Signal handler to gracefully stop the script
-def signal_handler(sig, frame):
-    print("Stopping the script...")
-    logging.info("Stopping the script...")
-    stop_event.set()
-    main_thread.join()
-    sys.exit(0)
-
-if __name__ == "__main__":
-    initialize_database()  # Ensure tables are created before starting
-    stop_event = threading.Event()
-    signal.signal(signal.SIGINT, signal_handler)
-    main_thread = threading.Thread(target=main)
-    main_thread.start()
-
-    update_hydration_logs()
+            logging.warning("Invalid input. Please enter a number.")
