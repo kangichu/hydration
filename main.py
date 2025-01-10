@@ -23,9 +23,12 @@ if __name__ == "__main__":
         # Initialize a threading event for stopping the loop
         stop_event = threading.Event()
         signal.signal(signal.SIGINT, signal_handler)  # Handle Ctrl+C
+
+        # Start the notification thread
         main_thread = threading.Thread(target=notification_main, args=(stop_event,))
         main_thread.start()
 
+        # Start the hydration logs update thread
         update_hydration_thread = threading.Thread(target=update_hydration_logs, args=(stop_event,))
         update_hydration_thread.start()
 

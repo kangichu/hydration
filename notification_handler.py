@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from plyer import notification
 import logging
-from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal, send_email, show_hydration_popup
+from db_utils import initialize_database, get_last_hydration_log_time, get_last_email_log_time, log_hydration_reminder, check_weekly_goal, send_email
 
 # Hydration Tracker Configuration
 DRINK_INTERVAL = 100  # minutes (1.67 hours)
@@ -45,7 +45,8 @@ def main(stop_event):
 
         # Check if the current time is within the allowed range (9 AM to 12 AM)
         if 9 <= current_hour < 24:
-            logging.info(f"Current time: {now}, Last drink time: {last_drink_time}")
+            next_drink_time = last_drink_time + timedelta(minutes=DRINK_INTERVAL)
+            logging.info(f"Current time: {now}, Last drink time: {last_drink_time}, Next drink time: {next_drink_time}")
             # Check if it's time to remind
             time_since_last_drink = (now - last_drink_time).total_seconds()
             logging.debug(f"Time since last drink: {time_since_last_drink} seconds")
@@ -58,11 +59,15 @@ def main(stop_event):
                     send_notification()
                     send_email("Hydration Reminder", "It's time to drink 0.5L of water!")
                     log_hydration_reminder(False, status='pending')  # Log as pending
-                    is_drunk = show_hydration_popup()
-                    if is_drunk is None:
-                        log_hydration_reminder(False, status='pending')
+
+                    # Terminal prompt to ask if the user drank the water
+                    response = input("Did you drink 0.5L of water as prompted? (yes/no): ").strip().lower()
+                    if response == 'yes':
+                        is_drunk = True
                     else:
-                        log_hydration_reminder(is_drunk, status='completed')
+                        is_drunk = False
+
+                    log_hydration_reminder(is_drunk, status='completed')
                     last_drink_time = now
 
             # Check weekly goal at the end of the week
