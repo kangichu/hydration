@@ -4,7 +4,7 @@ import logging
 import sys
 import os
 import subprocess
-from logging.handlers import TimedRotatingFileHandler
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 from handlers.notification_handler import main as notification_main
 from utils.db_utils import update_hydration_logs
 from dotenv import load_dotenv
@@ -17,10 +17,9 @@ log_folder = "logs"
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
 
-# Configure logging with daily rotation
+# Configure logging with rotation based on file size
 log_file = os.getenv("LOG_FILE", "logs/hydration_tracker.log")
-log_handler = TimedRotatingFileHandler(log_file, when="midnight", interval=1)
-log_handler.suffix = "%Y-%m-%d"
+log_handler = ConcurrentRotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=7)  # 10 MB per log file
 log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)s'))
 logging.getLogger().addHandler(log_handler)
 logging.getLogger().setLevel(logging.DEBUG)
