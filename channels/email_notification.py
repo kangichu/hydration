@@ -1,6 +1,6 @@
+import os
 import smtplib
 import logging
-import os
 from datetime import datetime
 from utils.db_utils import log_email_status
 

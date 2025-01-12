@@ -44,7 +44,7 @@ if __name__ == "__main__":
         update_hydration_thread = threading.Thread(target=update_hydration_logs, args=(stop_event,))
         update_hydration_thread.start()
 
-         # Open another terminal and run follow_latest_log.py
+        # Open another terminal and run follow_latest_log.py
         if sys.platform == "win32":
             subprocess.Popen(["start", "cmd", "/k", "python", "follow_latest_log.py"], shell=True)
         elif sys.platform == "darwin":
@@ -52,9 +52,8 @@ if __name__ == "__main__":
         elif sys.platform == "linux":
             subprocess.Popen(["gnome-terminal", "--", "python3", "follow_latest_log.py"])
 
-
         main_thread.join()
         update_hydration_thread.join()
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
         sys.exit(1)

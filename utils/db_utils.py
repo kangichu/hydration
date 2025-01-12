@@ -107,15 +107,31 @@ def get_last_email_log_time():
         return None
 
 # Log hydration reminder
-def log_hydration_reminder(is_drunk, status='pending', log_time=None):
+def log_hydration_reminder(is_drunk, status='pending', log_time=None, update_pending=False):
     try:
         with db_connect() as conn:
             cursor = conn.cursor()
             now = log_time if log_time else datetime.now()
-            cursor.execute("""
-            INSERT INTO hydration_logs (date_time, bottle_volume, is_drunk, status)
-            VALUES (%s, %s, %s, %s)
-            """, (now, 0.5, is_drunk, status))
+            if update_pending:
+                # Update the latest pending log entry to completed
+                cursor.execute("""
+                UPDATE hydration_logs
+                SET is_drunk = %s, status = %s
+                WHERE status = 'pending'
+                ORDER BY date_time DESC
+                LIMIT 1
+                """, (is_drunk, status))
+            else:
+                # Check if a log entry already exists within the same minute
+                cursor.execute("""
+                SELECT COUNT(*) FROM hydration_logs
+                WHERE DATE_FORMAT(date_time, '%Y-%m-%d %H:%i') = DATE_FORMAT(%s, '%Y-%m-%d %H:%i')
+                """, (now,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("""
+                    INSERT INTO hydration_logs (date_time, bottle_volume, is_drunk, status)
+                    VALUES (%s, %s, %s, %s)
+                    """, (now, 0.5, is_drunk, status))
             conn.commit()
             logging.info(f"Hydration reminder logged: {now}, Drunk: {is_drunk}, Status: {status}")
     except mysql.connector.Error as err:

@@ -20,11 +20,11 @@ SLEEP_INTERVAL = 60  # seconds
 INPUT_TIMEOUT = 60  # seconds
 
 # Send Notification
-def send_notification():
+def send_notification(next_drink_time):
     try:
         notification.notify(
             title=NOTIFICATION_TITLE,
-            message=NOTIFICATION_MESSAGE,
+            message=f"{NOTIFICATION_MESSAGE} Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}",
             timeout=10
         )
         logging.info("Notification sent.")
@@ -76,9 +76,9 @@ def main(stop_event):
                     logging.info("A notification has already been sent within the same period. Skipping this reminder.")
                 else:
                     logging.info("Time to send a hydration reminder.")
-                    send_notification()
-                    send_email("Hydration Reminder", "It's time to drink 0.5L of water!")
-                    send_whatsapp_message()
+                    send_notification(next_drink_time)
+                    send_email("Hydration Reminder", f"It's time to drink 0.5L of water! Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    send_whatsapp_message(f"It's time to drink 0.5L of water! Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     log_hydration_reminder(False, status='pending')  # Log as pending
 
                     # Terminal prompt to ask if the user drank the water with timeout
@@ -88,7 +88,8 @@ def main(stop_event):
                     else:
                         is_drunk = False
 
-                    log_hydration_reminder(is_drunk, status='completed')
+                    # Update the pending log entry to completed
+                    log_hydration_reminder(is_drunk, status='completed', update_pending=True)
                     last_drink_time = now
 
             # Check weekly goal at the end of the week
