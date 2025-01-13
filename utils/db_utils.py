@@ -239,6 +239,37 @@ def show_hydration_popup():
     timer.cancel()  # Cancel the timer if the user responds in time
     return is_drunk
 
+# Get pending hydration logs
+def get_pending_hydration_logs():
+    try:
+        with db_connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+            SELECT id, date_time
+            FROM hydration_logs
+            WHERE status = 'pending'
+            """)
+            pending_logs = cursor.fetchall()
+            return pending_logs
+    except mysql.connector.Error as err:
+        logging.error(f"Error fetching pending hydration logs: {err}")
+        return []
+
+# Update hydration log status
+def update_hydration_log_status(log_id, is_drunk, status):
+    try:
+        with db_connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE hydration_logs
+            SET is_drunk = %s, status = %s
+            WHERE id = %s
+            """, (is_drunk, status, log_id))
+            conn.commit()
+            logging.info(f"Hydration log {log_id} updated to {status}.")
+    except mysql.connector.Error as err:
+        logging.error(f"Error updating hydration log {log_id}: {err}")
+
 # CLI to update pending hydration logs
 def update_hydration_logs(stop_event):
     logging.debug("Starting CLI to update pending hydration logs.")
@@ -261,27 +292,28 @@ def update_hydration_logs(stop_event):
         for i, (log_id, date_time) in enumerate(pending_logs, start=1):
             print(f"{i}. {date_time}")
 
-        selection = input("Enter the number of the log you want to update (or 'q' to quit): ")
+        selection = input("Enter the numbers of the logs you want to update (comma-separated, or 'q' to quit): ")
         if selection.lower() == 'q':
             break
 
         try:
-            selection = int(selection)
-            if 1 <= selection <= len(pending_logs):
-                log_id = pending_logs[selection - 1][0]
-                with db_connect() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                    UPDATE hydration_logs
-                    SET is_drunk = %s, status = 'completed'
-                    WHERE id = %s
-                    """, (True, log_id))
-                    conn.commit()
-                print(f"Updated hydration reminder for log ID {log_id}.")
-                logging.info(f"Updated hydration reminder for log ID {log_id}.")
-            else:
-                print("Invalid selection. Please try again.")
-                logging.warning("Invalid selection.")
+            indices = [int(x) for x in selection.split(',') if x.isdigit()]
+            for i in indices:
+                if 1 <= i <= len(pending_logs):
+                    log_id = pending_logs[i - 1][0]
+                    with db_connect() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                        UPDATE hydration_logs
+                        SET is_drunk = %s, status = 'completed'
+                        WHERE id = %s
+                        """, (True, log_id))
+                        conn.commit()
+                    print(f"Updated hydration reminder for log ID {log_id}.")
+                    logging.info(f"Updated hydration reminder for log ID {log_id}.")
+                else:
+                    print(f"Invalid selection: {i}. Please try again.")
+                    logging.warning(f"Invalid selection: {i}.")
         except ValueError:
-            print("Invalid input. Please enter a number.")
-            logging.warning("Invalid input. Please enter a number.")
+            print("Invalid input. Please enter numbers separated by commas.")
+            logging.warning("Invalid input. Please enter numbers separated by commas.")

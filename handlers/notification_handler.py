@@ -78,18 +78,18 @@ def main(stop_event):
                     logging.info("Time to send a hydration reminder.")
                     send_notification(next_drink_time)
                     send_email("Hydration Reminder", f"It's time to drink 0.5L of water! Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                    send_whatsapp_message(f"It's time to drink 0.5L of water! Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    #send_whatsapp_message(f"It's time to drink 0.5L of water! Next drink time: {next_drink_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     log_hydration_reminder(False, status='pending')  # Log as pending
 
                     # Terminal prompt to ask if the user drank the water with timeout
                     response = input_with_timeout("Did you drink 0.5L of water as prompted? (yes/no): ", INPUT_TIMEOUT).strip().lower()
                     if response == 'yes':
                         is_drunk = True
+                        # Update the pending log entry to completed
+                        log_hydration_reminder(is_drunk, status='completed', update_pending=True)
                     else:
-                        is_drunk = False
+                        logging.info("User did not confirm drinking water. Keeping status as pending.")
 
-                    # Update the pending log entry to completed
-                    log_hydration_reminder(is_drunk, status='completed', update_pending=True)
                     last_drink_time = now
 
             # Check weekly goal at the end of the week
